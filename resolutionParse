@@ -1,0 +1,165 @@
+export const parseResolutionsParagraphs = function (paras, startIndex, originalFileName) {
+  let paraIndex = 1;
+  const parasObj = [];
+  let section = null;
+  let isAnnexPara = false;
+  let isNumber = false;
+
+  // find the first element where the The security Council is present
+  // So the paragraphs start after this , do startIndex = i + 1
+  for (let i = 0; i < paras.length; i++) {
+    if (paras[i].trim().indexOf('The Security Council') > -1) {
+      startIndex = i + 1;
+      break;
+    }
+  }
+
+  for (let j = startIndex; j < paras.length; j += 1) {
+    if (paras[j] !== undefined && paras[j] && paras[j] !== ' ') {
+      let opNum = null;
+      let paraType = '';
+      let paraText = '';
+      let paraObj = {};
+
+      // first para if Security council heading
+      if (paras[j].indexOf('Security Council') > -1 &&
+        (paras[j].length < 50)) {
+        // && !isNan(paras[j+1].trim()[0])      
+        j += 1;
+      }
+
+      //Some times sections can come in between oparas and can exceed the length 39 characters
+      if (paras[j].trim().length < 39 || (paras[j][0].match(/[a-z]/i) &&
+        paras[j - 1] && paras[j - 1] !== undefined && (!isNaN(paras[j - 1].trim()[0]) &&
+          paras[j + 1] && paras[j + 1] !== undefined && (!isNaN(paras[j + 1].trim()[0]))))) {
+        //|| (isNaN(paras[j].trim()[0]))) {
+        if (section === null || (section !== null && section.trim().indexOf('Annex') === -1)) {
+          section = paras[j].trim();
+        }
+        else {
+          j -= 1;
+        }
+        //Annex has to be be handled like APARA
+        if (paras[j] && paras[j].trim().startsWith('Annex') > 0) {
+          let annexCount = 0;
+          let annexSection = '';
+
+          paraType = 'APARA';
+          const nameCheck = "Name: ";
+
+          do {
+            j += 1;
+            if (paras[j] !== null && paras[j] !== undefined &&
+              (paras[j].trim().indexOf('Annex') === -1)) {
+              //sections contains text in single line like "Additional information"
+              //Length is less than 39 create trim para and remove brackets
+              if (paras[j].trim().length < 39 && paras[j].trim().length > 0) {
+                annexCount += 1;
+                const trimpara = paras[j].trim();
+                if (trimpara[trimpara.length - 1] == ')') {
+                  section = trimpara.substring(0, trimpara.length);
+                } else {
+                  section = trimpara.substring(0, trimpara.length - 1);
+                }
+
+                if (annexCount == 1) {
+                  annexSection = section;
+                }
+                continue;
+              }
+              if (!section.startsWith("Annex")) {
+                paraText = paras[j].trim();
+
+                //separatine Name: into two different paragraphs and the name has to be in the middle
+                if (paraText.indexOf(nameCheck) > 5) {
+                  const paraTextArray = paraText.split(nameCheck);
+                  const nameSplitFirst = paraTextArray[0].substring(0, paraTextArray[0].length - 3);
+                  const nameSplitSecond = paraTextArray[0].substring(paraTextArray[0].length - 3, paraTextArray[0].length - 1) + " Name: " + paraTextArray[1];
+
+                  paraObj.DC_paragraphOPSequence = Number(paraIndex);
+                  paraObj.DC_paragraphSequence = ""
+                  paraObj.DC_paragraphSection = section;
+                  paraObj.DC_paragraphType = paraType;
+                  paraObj.DC_paragraphText = nameSplitFirst;
+                  paraObj.DC_pdfName = originalFileName;
+
+                  parasObj.push(paraObj);
+                  paraObj = {};
+                  paraIndex += 1;
+                  paraObj.DC_paragraphOPSequence = Number(paraIndex);
+                  paraObj.DC_paragraphSequence = ""
+                  paraObj.DC_paragraphSection = annexSection;
+                  paraObj.DC_paragraphType = paraType;
+                  paraObj.DC_paragraphText = nameSplitSecond;
+                  paraObj.DC_pdfName = originalFileName;
+                  parasObj.push(paraObj);
+                  paraObj = {};
+                  paraIndex += 1;
+                } else {
+                  paraObj.DC_paragraphOPSequence = Number(paraIndex);
+                  paraObj.DC_paragraphSequence = ""
+                  paraObj.DC_paragraphSection = section;
+                  paraObj.DC_paragraphType = paraType;
+                  paraObj.DC_paragraphText = paraText;
+                  paraObj.DC_pdfName = originalFileName;
+                  parasObj.push(paraObj);
+                  paraIndex += 1;
+                  paraObj = {};
+                }
+              }
+            } else {
+              j -= 1;
+              break;
+            }
+            if (paras[j + 1] && paras[j + 1].trim().startsWith('Annex')) {
+              section = paras[j + 1].trim();
+              j += 1;
+            }
+          } while (j < paras.length);
+        }
+        // Opara statrts with numbers
+      } else if (!isNaN(paras[j][0]) || (paras[j][0].indexOf('(') > -1) || (paras[j][1].indexOf('.') > -1) || (paras[j][2].indexOf('.') > -1) || (paras[j][3].indexOf('.') > -1) || (paras[j][0].indexOf('-') > -1)) {
+        //paraType = 'OP';
+        paraType = 'OP';
+        // const dotIndx = paras[j].indexOf('.');
+        // opNum = paras[j].substring(0, dotIndx);
+
+        //paraText = paras[j].substring(dotIndx + 1).trim();
+        paraText = paras[j]
+              //let textparasub = `${paraText}"\n"${subParaText}`
+              paraObj.DC_paragraphOPSequence = Number(paraIndex);
+              paraObj.DC_paragraphSequence = ""
+              paraObj.DC_pdfName = originalFileName;
+              paraObj.DC_paragraphText = paraText;
+              //paraObj.DC_paragraphText = subParaText;
+              //paraObj.DC_paragraphOPSequence = opNum + subOpNum;
+              //paraObj.DC_paragraphType = `${paraText}\n${subParaText}`;
+              paraObj.DC_paragraphType = paraType;
+              paraObj.DC_paragraphSection = section;
+              parasObj.push(paraObj);
+              paraObj = {};
+              paraIndex += 1;
+            }
+        
+        else {
+          //Assign PP to paratype and All the divisions
+          paraType = 'PP';
+          paraText = paras[j].trim();
+  
+          paraObj.DC_paragraphOPSequence = Number(paraIndex);
+          paraObj.DC_paragraphSequence =" "
+          paraObj.DC_pdfName = originalFileName;
+          paraObj.DC_paragraphSection = section;
+          paraObj.DC_paragraphType = paraType;
+          paraObj.DC_paragraphText = paraText;
+          parasObj.push(paraObj);
+          paraIndex += 1;
+          paraObj = {};
+        }
+      }
+      else 
+        return parasObj 
+    }
+
+  return parasObj;
+};
